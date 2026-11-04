@@ -26,3 +26,8 @@ http-body-util = "0.1"
 default = []
 web = ["dioxus/web", "dep:gloo-net"]
 server = ["dioxus/server", "dep:anyhow", "dep:axum", "dep:tokio", "dep:sqlx"]
+
+# 디스크 절약: 디버거 정보와 증분 캐시를 남기지 않는다 (패닉 위치 표시는 유지된다)
+[profile.dev]
+debug = 0
+incremental = false

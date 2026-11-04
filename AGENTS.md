@@ -60,6 +60,8 @@ npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 - `cargo test`의 DB 통합 테스트는 로컬 Postgres를 가리키는 `DATABASE_URL`이 필요하다. `#[sqlx::test]`가 테스트마다 DB를 만들므로 DB 생성 권한이 있는 계정을 쓴다.
   - 로컬 Postgres: `docker run -d --name short-url-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=short_url -p 5432:5432 postgres:17`
   - `DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url` (셸 환경변수나 `.env`로 지정)
+  - 여러 에이전트가 동시에 테스트하면 `#[sqlx::test]`의 테스트 DB 이름이 충돌한다. 에이전트마다 기준 DB를 따로 만들어(`docker exec short-url-pg createdb -U postgres short_url_<이름>`) `DATABASE_URL`의 DB 이름을 바꾼다.
+- 디스크 여유가 적다. `[profile.dev]`의 `debug = 0`, `incremental = false`를 유지하고, 로컬 `docker build`처럼 수 GB를 쓰는 작업은 사용자에게 먼저 묻는다.
 - 기능 플래그: `server`(서버·DB), `web`(브라우저 WASM). `default`는 비어 있고 `dx`가 플랫폼에 맞춰 자동으로 켠다.
 - `dx build --release`는 서버와 WASM을 모두 release로 빌드해 첫 실행에 15분 정도 걸린다. 셸 타임아웃을 넉넉히 잡고 백그라운드로 돌린다.
 - `dx serve`/`cargo test` 전에 서로의 `target` 잠금을 피하려면 `dx serve`를 먼저 끈다.
