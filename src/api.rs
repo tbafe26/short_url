@@ -11,8 +11,8 @@ use sqlx::PgPool;
 
 use crate::dto::{CreateLinkRequest, LinkResponse};
 use crate::links;
-use crate::validation::validate_original_url;
 use crate::short_number::parse_short_number;
+use crate::validation::validate_original_url;
 
 /// 라우터가 공유하는 상태.
 #[derive(Clone)]
