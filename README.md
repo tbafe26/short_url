@@ -6,138 +6,271 @@
 - 테스트 단축 URL: https://short-url.tbafe.workers.dev/2
 - 테스트 원본 URL: https://www.rust-lang.org/learn/get-started?lang=ko#installing-rust
 
-로그인 없이 긴 URL을 `/123`처럼 숫자로만 된 단축 주소로 바꾸는 서비스다. 한 번 발급한 단축 번호와 원본 URL의 연결(링크)은 바꾸거나 지울 수 없다. 용어는 [GLOSSARY.md](GLOSSARY.md)를, 설계 결정은 [docs/adr/](docs/adr/)를 따른다.
+> 로그인 없이 긴 URL을 `/123`처럼 **숫자로만 된 단축 주소**로 바꾸는 Dioxus 풀스택(Rust) 서비스입니다.
+> 한 번 발급한 단축 번호와 원본 URL의 연결(링크)은 **바꾸거나 지울 수 없습니다.**
 
-## 화면
+<p align="center">
+  <img src="docs/images/result.png" alt="단축 주소를 만들고 복사한 뒤의 화면" width="520">
+  <br>
+  <sub>원본 URL을 넣고 <b>단축하기</b> → 단축 주소와 원본 표시 → <b>복사</b></sub>
+</p>
 
-단축 주소를 만들고 복사한 뒤의 화면이다. 원본 URL을 넣고 **단축하기**를 누르면 단축 주소와 원본이 나오고, **복사**로 클립보드에 담는다.
+## 목차
 
-![단축 주소를 만들고 복사한 뒤의 화면](docs/images/result.png)
+1. [주요 기능](#주요-기능)
+2. [아키텍처](#아키텍처)
+3. [설계](#설계)
+4. [API](#api)
+5. [프로젝트 구조](#프로젝트-구조)
+6. [로컬 실행](#로컬-실행)
+7. [배포](#배포)
+8. [검증](#검증)
+9. [관련 문서](#관련-문서)
 
-## 구성
+## 주요 기능
 
-```
-브라우저 ──HTTPS──▶ Cloudflare Worker (workers.dev)
-                     ├─ /, /assets/*  → Dioxus 웹 화면 (Static Assets)
-                     └─ /api/*, /123  → Railway 백엔드로 프록시 (301 응답은 그대로 전달)
-                                          │
-                                          ▼
-                              Railway: Rust 백엔드 (Dioxus 풀스택 서버 + axum) ──▶ Railway Postgres
-```
-
-| 위치 | 역할 | 주요 파일 |
+| 요구사항 | 구현 | 코드 |
 | --- | --- | --- |
-| Cloudflare Worker | 공개 HTTPS 접점, 웹 화면 제공, API·이동 프록시 | `cloudflare/wrangler.jsonc`, `cloudflare/src/worker.js` |
-| 웹 화면 (Dioxus WASM) | 원본 URL 입력, 단축 주소 표시·복사 | `src/main.rs`, `assets/main.css`, `index.html`, `Dioxus.toml` |
-| Railway 백엔드 | 링크 생성 API, 301 이동, 404 안내, 변경 거부 | `Dockerfile`, `railway.json`, `src/` |
-| Railway Postgres | 링크 영구 저장 | `migrations/` |
+| 로그인 없이 생성·이동 | 인증 없는 공개 API와 화면 | `src/api.rs`, `src/main.rs` |
+| 입력·생성·결과 표시·복사 화면 | Dioxus 웹 화면(WASM). Enter로도 생성, 클립보드 복사 | `src/main.rs`, `assets/main.css` |
+| 숫자로만 된 단축 경로 | DB의 `IDENTITY` 기본키로만 번호 발급 | `migrations/0001_create_links.sql` |
+| 번호 충돌·중복 방지 | DB 시퀀스 + `PRIMARY KEY` + `GENERATED ALWAYS` | 같은 파일 |
+| 변경·삭제·만료·재사용 없음 | API 405 + 저장소 코드 + DB 트리거, 세 겹 | `src/api.rs`, `src/links.rs`, `migrations/0002_links_immutable.sql` |
+| `/숫자` → HTTP 리디렉션 | `301` + 원본 URL 그대로(경로·쿼리·프래그먼트 보존) | `src/api.rs` `redirect` |
+| 서버 측 입력 검증 | `http`/`https`만, host 필수, 2048자 이하 | `src/validation.rs` |
+| 없는 번호는 404 | 읽을 수 있는 안내 페이지 | `src/api.rs` `not_found` |
+| 데이터 영구 저장 | Railway PostgreSQL 17 | `migrations/` |
 
-- **같은 출처**: 브라우저는 Worker 주소로만 요청한다. 그래서 CORS 설정이 필요 없고, 백엔드 주소가 화면 코드에 들어가지 않는다 (ADR-0001).
-- **화면과 서버를 한 크레이트에**: `web` 기능으로 화면(WASM)을, `server` 기능으로 서버를 빌드한다. 화면은 Worker가 정적 파일로 주므로, 웹 빌드에는 hydration(`dioxus/fullstack`)을 넣지 않는다.
+## 아키텍처
 
-### API
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="아키텍처: 사용자 → Cloudflare Worker → Railway 백엔드 → PostgreSQL" width="100%">
+</p>
 
-| 요청 | 응답 |
+| 구성 요소 | 플랫폼 | 역할 | 설정 파일 |
+| --- | --- | --- | --- |
+| Worker 스크립트 | Cloudflare Workers | 공개 HTTPS 접점. `/api/*`와 `/{숫자}`는 백엔드로 프록시, 나머지는 정적 파일 | `cloudflare/wrangler.jsonc`, `cloudflare/src/worker.js` |
+| 웹 화면 | Cloudflare Static Assets | Dioxus 웹 번들(index.html, WASM, CSS) | `src/main.rs`, `assets/main.css`, `index.html`, `Dioxus.toml` |
+| 백엔드 | Railway (Docker) | 생성 API, 301 이동, 404 안내, 변경 거부 | `Dockerfile`, `railway.json`, `src/` |
+| DB | Railway PostgreSQL 17 | 링크 영구 저장, 번호 발급, 불변성 강제 | `migrations/` |
+
+**요청 흐름**
+
+- **생성**: 브라우저 → Worker `POST /api/links` → 백엔드가 URL 검증 → DB `INSERT`가 번호 발급 → `201` + 단축 주소
+- **이동**: 브라우저 → Worker `GET /27` → 백엔드가 DB 조회 → `301 Location: <원본 URL>` → 브라우저가 원본으로 이동
+
+**설계 포인트**
+
+- **같은 출처**: 브라우저는 Worker 주소로만 요청합니다. 그래서 CORS가 필요 없고, 백엔드 주소가 화면 코드에 들어가지 않습니다 (ADR-0001).
+- **화면과 서버를 한 크레이트에**: `web` 기능으로 화면(WASM)을, `server` 기능으로 서버를 빌드합니다. 화면은 Worker가 정적 파일로 주므로 웹 빌드에는 hydration(`dioxus/fullstack`)을 넣지 않습니다.
+
+<details>
+<summary><b>Worker 라우팅 규칙</b> (<code>cloudflare/src/worker.js</code>)</summary>
+
+- `/api`, `/api/*`, 숫자로만 된 단일 세그먼트(`/^\/[0-9]+$/`) → Railway 백엔드로 프록시
+  - `fetch(..., { redirect: "manual" })`로 받아 백엔드의 `301`과 `Location`을 그대로 브라우저에 전달합니다.
+  - 정규형 판정(`/0`, `/0123` → 404)은 백엔드가 합니다.
+  - Railway 절전에서 깨어나는 첫 GET이 `502`/`503`이면 한 번 다시 시도합니다.
+- 그 밖의 경로 → `env.ASSETS.fetch`로 웹 화면 정적 파일
+- `not_found_handling`을 SPA로 두지 않습니다. 그러면 브라우저에서 연 `/123`이 Worker 스크립트를 거치지 않기 때문입니다.
+
+</details>
+
+### 기술 스택
+
+| 영역 | 사용 기술 |
 | --- | --- |
-| `POST /api/links` `{"url": "<원본 URL>"}` | `201` `{"number", "short_url", "original_url"}`. 검증 실패는 `400` `{"error": "<메시지>"}` |
-| `GET /{n}` | 정규형 번호이고 링크가 있으면 `301` + `Location: <원본 URL>`. 그 밖에는 `404` 안내 HTML |
-| `PUT`·`PATCH`·`DELETE /api/links/{n}` | 항상 `405` + `Allow` 헤더(빈 값) + 불변성 설명 |
-| `GET /api/health` | `200 ok` (Railway 헬스 체크) |
+| 언어·프레임워크 | Rust, Dioxus 0.7.10 (풀스택: 웹 WASM + 서버) |
+| 서버 | axum 0.8, tokio |
+| DB | PostgreSQL 17, sqlx 0.9 (마이그레이션 내장) |
+| 공개 접점 | Cloudflare Workers + Static Assets (`workers.dev`) |
+| 백엔드 호스팅 | Railway (Dockerfile 빌드, Trial 크레딧) |
 
-## 설계: 번호 발급, 중복 방지, 불변성
+## 설계
 
-### 숫자 발급 방식
+### 단축 번호 발급과 중복 방지
 
-- 단축 번호는 Postgres의 `number BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`로만 발급한다. 애플리케이션은 번호를 계산하거나 지정하지 않는다.
-- 1부터 순서대로 발급한다. 트랜잭션이 실패하면 번호에 구멍이 생길 수 있지만, 같은 번호가 두 번 나오지는 않는다.
-- **같은 원본 URL을 다시 입력하면 항상 새 번호를 발급한다.** 기존 번호를 돌려주려면 긴 URL에 UNIQUE 제약(해시 컬럼)을 걸고, 동시 입력 경쟁도 처리해야 한다. 그래서 단순한 규칙을 택했다 (ADR-0002).
-- 정규형만 인정한다. 1 이상이고, 앞자리에 0이 없고, `i64` 범위 안이어야 한다. `/0`, `/0123`, 범위를 넘는 숫자, 없는 번호는 모두 404 안내 페이지로 응답한다. 그래서 링크 하나에 단축 주소는 정확히 하나다.
+```sql
+CREATE TABLE links (
+    number       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    original_url TEXT NOT NULL CHECK (char_length(original_url) <= 2048),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
 
-### 중복 방지
+- **번호는 DB만 발급합니다.** 애플리케이션은 번호를 계산하거나 지정하지 않습니다. 시퀀스가 원자적으로 나눠 주므로 동시에 요청이 들어와도 충돌하지 않습니다.
+- **`PRIMARY KEY`**(UNIQUE 포함)가 같은 번호의 두 번째 저장을 한 번 더 막습니다.
+- **`GENERATED ALWAYS`**라서 번호를 직접 지정한 `INSERT`도 거부됩니다. 이미 쓰인 번호를 다른 URL에 다시 쓸 수 없습니다.
+- **같은 원본 URL은 매번 새 번호를 받습니다.** 기존 번호를 돌려주려면 긴 URL에 UNIQUE(해시 컬럼)를 걸고 동시 입력 경쟁까지 처리해야 하므로, 단순한 규칙을 택했습니다 (ADR-0002).
+- **정규형만 인정합니다.** 1 이상, 앞자리 0 없음, `i64` 범위 안. `/0`, `/0123`, 범위를 넘는 숫자는 404입니다. 그래서 링크 하나에 단축 주소는 정확히 하나입니다.
 
-- 번호는 DB 시퀀스가 원자적으로 나눠 준다. 동시에 요청이 들어와도 충돌하지 않는다.
-- `PRIMARY KEY` 제약이 같은 번호의 두 번째 저장을 한 번 더 막는다.
-- `GENERATED ALWAYS`라서 번호를 직접 지정한 `INSERT`도 거부된다. 그래서 이미 쓰인 번호를 다른 URL에 다시 쓸 수 없다.
+### 생성 후 불변: 세 겹 방어 (ADR-0002)
 
-### 생성 후 불변 (세 겹, ADR-0002)
+| 층 | 방법 |
+| --- | --- |
+| 1. API | 생성 경로만 있습니다. `/api/links/{n}`의 `PUT`·`PATCH`·`DELETE`는 링크 존재 여부와 상관없이 `405`로 거부합니다. 화면에 버튼이 없는 것에 그치지 않고 서버가 거부합니다. |
+| 2. 저장소 코드 | `src/links.rs`의 공개 함수는 `insert`와 `find`뿐입니다. |
+| 3. DB | `BEFORE UPDATE OR DELETE` 행 트리거와 `BEFORE TRUNCATE` 문장 트리거가 SQL로 직접 시도한 변경도 막습니다. |
 
-1. **API**: 생성 경로만 있다. `/api/links/{n}`에 대한 `PUT`/`PATCH`/`DELETE`는 링크 존재 여부와 상관없이 `405`로 명시적으로 거부한다. 화면에 버튼이 없는 것에 그치지 않고, 서버가 거부한다.
-2. **저장소 코드**: `src/links.rs`의 공개 함수는 `insert`와 `find`뿐이다.
-3. **DB**: `migrations/0002_links_immutable.sql`의 트리거가 SQL로 직접 시도한 변경도 막는다.
-   - `BEFORE UPDATE OR DELETE` 행 트리거
-   - `BEFORE TRUNCATE` 문장 트리거
+수정, 삭제, 자동 만료 기능은 없습니다.
 
-수정, 삭제, 자동 만료 기능은 없다.
+### 리디렉션
+
+`GET /{n}`은 `301 Moved Permanently`로 응답하고, `Location`에 저장된 원본 URL을 **그대로** 넣습니다. 경로·쿼리·프래그먼트가 모두 보존됩니다.
+
+```
+GET /2  →  301  Location: https://www.rust-lang.org/learn/get-started?lang=ko#installing-rust
+```
 
 ### 원본 URL 검증 (서버)
 
-`url` 크레이트로 파싱한 뒤 아래 조건을 모두 통과해야 링크로 만든다. 저장할 때는 정규화한(직렬화한) 값을 쓰며, 경로·쿼리·프래그먼트는 보존된다.
+`url` 크레이트로 파싱한 뒤 아래 조건을 **모두** 통과해야 링크로 만듭니다. 저장은 정규화한 값으로 합니다. 화면의 검증은 편의 기능이고, 판단은 서버가 합니다.
 
-- 앞뒤 공백을 제거한다.
-- scheme이 `http` 또는 `https`여야 한다.
-- host가 있어야 한다.
-- 2048자 이하여야 한다.
-- 서비스 자신의 host(`PUBLIC_BASE_URL`)가 아니어야 한다. 단축 주소를 다시 단축하는 것을 막는다.
+- 앞뒤 공백 제거
+- scheme이 `http` 또는 `https`
+- host가 있음
+- 2048자 이하
+- 서비스 자신의 host(`PUBLIC_BASE_URL`)가 아님 (단축 주소를 다시 단축하는 것을 막음)
+
+실패하면 `400`과 `{"error": "<안내 메시지>"}`로 응답하고, 화면은 그 메시지를 그대로 보여 줍니다.
+
+## API
+
+| 요청 | 응답 |
+| --- | --- |
+| `POST /api/links` `{"url": "<원본 URL>"}` | `201` `{"number", "short_url", "original_url"}` · 검증 실패나 본문 형식 오류는 `400` `{"error"}` |
+| `GET /{n}` | 링크가 있으면 `301` + `Location: <원본 URL>` · 없거나 정규형이 아니면 `404` 안내 HTML |
+| `PUT`·`PATCH`·`DELETE /api/links/{n}` | 항상 `405` + 불변성 안내 `{"error"}` |
+| `GET /api/health` | `200 ok` (Railway 헬스 체크) |
+
+## 프로젝트 구조
+
+```
+short_url/
+├── src/
+│   ├── main.rs           # 진입점 + 생성 화면(Dioxus 컴포넌트)
+│   ├── api.rs            # API 라우터: 생성, 301 이동, 404, 405
+│   ├── links.rs          # 저장소: insert, find (변경 함수 없음)
+│   ├── validation.rs     # 원본 URL 검증
+│   ├── short_number.rs   # 단축 번호 정규형 판정
+│   └── dto.rs            # 요청·응답 타입
+├── migrations/           # 테이블 생성, 불변성 트리거
+├── tests/                # API·DB 통합 테스트 (19개)
+├── assets/main.css       # 화면 스타일
+├── index.html            # 웹 번들 HTML 템플릿
+├── Dioxus.toml           # dx 설정 (페이지 제목)
+├── cloudflare/           # Worker 스크립트와 wrangler 설정
+├── Dockerfile            # Railway 백엔드 이미지 (멀티스테이지)
+├── railway.json          # Railway 빌드·헬스 체크 설정
+├── .env.example          # 환경변수 이름 (값 없음)
+└── docs/                 # ADR, 정리 목록, 이미지
+```
 
 ## 로컬 실행
 
 ### 준비물
 
-- Rust stable + `wasm32-unknown-unknown` 타깃. Windows는 MSVC Build Tools(C++)가 필요하다.
+- Rust stable + `wasm32-unknown-unknown` 타깃 (Windows는 MSVC Build Tools(C++) 필요)
 - Dioxus CLI 0.7.10: `cargo install dioxus-cli --version 0.7.10 --locked`
 - Docker (로컬 Postgres)
 - Node.js (Cloudflare `wrangler`)
 
-### DB 준비
+### 1. DB 준비
 
 ```bash
 docker run -d --name short-url-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=short_url -p 5432:5432 postgres:17
 ```
 
-스키마는 서버가 시작할 때 `sqlx::migrate!`로 자동 적용된다. 따로 마이그레이션을 실행하지 않아도 된다.
+로컬 테스트 전용 컨테이너라 비밀번호는 기본값을 씁니다. 스키마는 서버가 시작할 때 `sqlx::migrate!`로 자동 적용됩니다.
 
-### 환경변수
+### 2. 환경변수
 
-[.env.example](.env.example)에 이름만 있다. 실제 값은 셸 환경변수나 배포 환경에 넣는다.
+[`.env.example`](.env.example)에 **이름만** 있습니다. 실제 값은 셸 환경변수나 배포 환경에 넣습니다.
 
-**비밀 값은 저장소에 없다.** DB 접속 정보는 Railway 변수에서 `${{Postgres.DATABASE_URL}}` 참조로만 전달되고, `.env`는 `.gitignore`로 제외된다. 브라우저 번들(WASM)과 `cloudflare/wrangler.jsonc`에는 공개 주소(`BACKEND_ORIGIN`)만 들어 있다.
-
-| 변수 | 위치 | 설명 |
+| 변수 | 쓰는 곳 | 설명 |
 | --- | --- | --- |
-| `DATABASE_URL` | 백엔드, 테스트 | Postgres 접속 주소. Railway에서는 `${{Postgres.DATABASE_URL}}` |
+| `DATABASE_URL` | 백엔드, 테스트 | Postgres 접속 주소. Railway에서는 `${{Postgres.DATABASE_URL}}` 참조 |
 | `PUBLIC_BASE_URL` | 백엔드 | 서비스 공개 주소(Worker 주소, 끝에 `/` 없이). 단축 주소의 기준 |
-| `IP`, `PORT` | 백엔드 | 바인드 주소. 이미지는 `IP=0.0.0.0`이고, Railway가 `PORT`를 주입한다 |
+| `IP`, `PORT` | 백엔드 | 바인드 주소. 이미지는 `IP=0.0.0.0`이고 Railway가 `PORT`를 주입 |
 | `BACKEND_ORIGIN` | Worker | Railway 백엔드 공개 주소. `wrangler.jsonc`의 `vars`나 `--var`로 지정 |
 
-### 실행
+### 3. 실행
 
-**1. 백엔드 + 화면 (개발 서버)**
+**개발 서버 (백엔드 + 화면)**
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url PUBLIC_BASE_URL=http://localhost:8080 dx serve --fullstack
 ```
 
-**2. 배포와 같은 구성으로 확인 (release 서버 + 로컬 Worker)**
+**배포와 같은 구성 (release 서버 + 로컬 Worker)**
 
-먼저 release로 빌드한다.
+release로 빌드합니다.
 
 ```bash
 dx build --release --fullstack
 ```
 
-빌드 결과 폴더로 이동해 서버를 띄운다.
+빌드 결과 폴더에서 서버를 띄웁니다. Windows에서는 `server.exe`입니다.
 
 ```bash
 cd target/dx/short_url/release/web && IP=127.0.0.1 PORT=8081 DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url PUBLIC_BASE_URL=http://localhost:8787 ./server
 ```
 
-다른 터미널에서, 저장소 루트를 기준으로 Worker를 띄운다.
+다른 터미널에서, 저장소 루트를 기준으로 Worker를 띄우고 `http://localhost:8787`을 엽니다.
 
 ```bash
 npx wrangler dev --config cloudflare/wrangler.jsonc --port 8787 --var BACKEND_ORIGIN:http://127.0.0.1:8081
 ```
 
-브라우저로 `http://localhost:8787`을 연다. Windows에서는 서버 파일이 `server.exe`다.
+## 배포
+
+### 1. Railway (백엔드 + DB)
+
+1. Railway에 GitHub 계정으로 가입합니다. 카드는 등록하지 않습니다.
+2. **New Project → Deploy from GitHub repo**에서 이 저장소를 고릅니다. 루트의 `railway.json` 때문에 `Dockerfile` 빌드와 `/api/health` 헬스 체크가 적용됩니다.
+3. **+ Create → Database → PostgreSQL**을 추가합니다.
+4. 백엔드 서비스 **Variables**에 아래 두 변수를 넣습니다.
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
+   - `PUBLIC_BASE_URL` = Worker 주소 (Cloudflare 배포 후)
+5. **Settings → Networking → Generate Domain**으로 `https://<백엔드>.up.railway.app`을 만듭니다.
+6. (선택) **Settings → Deploy → Serverless**를 켜면 유휴 시간에 절전해 크레딧을 아낍니다. Postgres에는 켜지 않습니다.
+
+이후에는 `main`에 push하면 Railway가 자동으로 다시 빌드·배포합니다. `Dockerfile`은 멀티스테이지로, 1단계에서 `dx build --release --fullstack`으로 빌드하고 2단계에서 실행 파일과 `public/`만 `debian:trixie-slim`에 담습니다.
+
+### 2. Cloudflare (공개 접점)
+
+출력 폴더를 지우고 깨끗하게 다시 빌드합니다.
+
+```bash
+rm -rf target/dx/short_url/release/web && dx build --release --fullstack
+```
+
+Cloudflare에 로그인합니다.
+
+```bash
+npx wrangler login
+```
+
+배포합니다. `wrangler.jsonc`의 `vars.BACKEND_ORIGIN`에 지금 쓰는 백엔드 주소가 들어 있습니다.
+
+```bash
+npx wrangler deploy --config cloudflare/wrangler.jsonc
+```
+
+배포가 끝나면 `https://short-url.<하위 도메인>.workers.dev`가 출력됩니다. 이 주소를 Railway의 `PUBLIC_BASE_URL`에 넣습니다. 다른 백엔드를 가리키려면 `--var BACKEND_ORIGIN:https://<백엔드>.up.railway.app`을 붙입니다.
+
+### 비밀 값 관리
+
+- **저장소에는 비밀 값이 없습니다.** 커밋 이력 전체를 검사해 확인했습니다.
+- DB 접속 정보는 Railway 변수에서 `${{Postgres.DATABASE_URL}}` **참조**로만 전달됩니다. 실제 값은 Railway 밖으로 나오지 않습니다.
+- `.env`는 `.gitignore`로 제외되고, 저장소에는 이름만 있는 `.env.example`만 있습니다.
+- 브라우저 번들(WASM)과 `cloudflare/wrangler.jsonc`에는 공개 주소(`BACKEND_ORIGIN`)만 들어 있습니다.
+
+### 비용
+
+운영 비용은 **0원**입니다 (ADR-0003). Railway는 카드 없이 Trial 크레딧 안에서만 운영합니다. 크레딧이 떨어지면 서비스가 멈출 뿐 청구되지 않습니다. Cloudflare는 무료 플랜과 무료 `workers.dev` 주소를 씁니다. 정리 방법은 [`docs/cleanup.md`](docs/cleanup.md)에 있습니다.
+
+## 검증
 
 ### 검증 명령
 
@@ -150,101 +283,65 @@ dx build --release --fullstack
 npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 ```
 
-`cargo test`에는 `DATABASE_URL`이 필요하다. `#[sqlx::test]`가 테스트마다 격리된 DB를 만들고 마이그레이션을 적용한다.
+모두 통과합니다. `cargo test`(19개)에는 `DATABASE_URL`이 필요하며, `#[sqlx::test]`가 테스트마다 격리된 DB를 만들고 마이그레이션을 적용합니다.
 
-## 배포
+### 확인 시나리오와 결과
 
-운영 비용은 0원이다 (ADR-0003). Railway에는 카드를 등록하지 않고 Trial/Free 크레딧 안에서만 운영한다. 크레딧이 떨어지면 서비스가 멈출 뿐 청구되지는 않는다. Cloudflare는 무료 플랜과 무료 `workers.dev` 주소를 쓴다.
+배포 환경(`https://short-url.tbafe.workers.dev`, 2026-11-05)에서 확인한 결과입니다.
 
-### 1. Railway (백엔드 + DB)
-
-1. Railway에 GitHub 계정으로 가입한다. 카드는 등록하지 않는다.
-2. **New Project → Deploy from GitHub repo**에서 이 저장소를 고른다. 루트의 `railway.json` 때문에 `Dockerfile` 빌드와 `/api/health` 헬스 체크가 적용된다.
-3. **+ New → Database → PostgreSQL**을 추가한다.
-4. 백엔드 서비스 **Variables**에 다음을 넣는다.
-   - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
-   - `PUBLIC_BASE_URL=<Worker 주소>` (3단계 뒤에 넣는다)
-5. **Settings → Networking → Generate Domain**으로 `https://<백엔드>.up.railway.app`을 만든다.
-6. **Settings → Deploy → Serverless**를 켠다. 유휴 시간에 절전해 크레딧을 아낀다. Postgres는 켜지 않는다.
-
-`Dockerfile`은 멀티스테이지다. 1단계에서 `dx build --release --fullstack`으로 서버와 웹 번들을 빌드하고, 2단계에서 실행 파일과 `public/`만 `debian:trixie-slim`에 담는다.
-
-### 2. Cloudflare (공개 접점)
-
-출력 폴더를 지우고 깨끗하게 다시 빌드한다.
-
-```bash
-rm -rf target/dx/short_url/release/web && dx build --release --fullstack
-```
-
-Cloudflare에 로그인한다.
-
-```bash
-npx wrangler login
-```
-
-백엔드 주소를 넣어 배포한다.
-
-```bash
-npx wrangler deploy --config cloudflare/wrangler.jsonc
-```
-
-`wrangler.jsonc`의 `vars.BACKEND_ORIGIN`에 지금 쓰는 백엔드 주소(`https://shorturl-production-fb10.up.railway.app`)가 들어 있다. 공개 주소라 비밀 값이 아니다. 다른 백엔드를 가리키려면 `--var BACKEND_ORIGIN:https://<백엔드>.up.railway.app`을 붙인다.
-
-배포가 끝나면 `https://short-url.<계정>.workers.dev`가 출력된다. 이 주소를 Railway의 `PUBLIC_BASE_URL`에 넣는다.
-
-### 라우팅 구성
-
-`cloudflare/src/worker.js`는 경로를 이렇게 나눈다.
-
-- `/api` 또는 `/api/`로 시작하는 경로, 그리고 숫자로만 된 단일 세그먼트(`/^\/[0-9]+$/`): Railway 백엔드로 프록시한다.
-  - `fetch(..., { redirect: "manual" })`로 받아, 백엔드의 301 응답과 `Location` 헤더를 그대로 브라우저에 전달한다.
-  - 정규형 판정(`/0`, `/0123` → 404)은 백엔드가 한다.
-  - Railway 절전에서 깨어나는 첫 GET이 502/503이면 한 번 다시 시도한다.
-- 그 밖의 경로: `env.ASSETS.fetch`로 웹 화면 정적 파일을 준다.
-- `not_found_handling`을 SPA로 두지 않는다. 그러면 브라우저에서 연 `/123`이 Worker 스크립트를 거치지 않기 때문이다.
-
-## 확인 시나리오
-
-| 시나리오 | 자동 테스트 | 재현 방법 |
+| 시나리오 | 자동 테스트 | 배포 환경 결과 |
 | --- | --- | --- |
-| 시크릿 창에서 생성하고 복사 | – (화면) | 시크릿 창에서 서비스 URL을 열고 URL 입력 → 생성 → 복사 |
-| 다른 브라우저에서 단축 주소로 이동 | `tests/issue_and_redirect.rs` | 복사한 주소를 다른 브라우저에서 열어 원본으로 가는지 확인 |
-| 서로 다른 URL 동시 생성 시 충돌·덮어쓰기 없음 | `tests/concurrency_persistence.rs` (50건 병렬) | 아래 동시 요청 명령 실행 후, 번호가 모두 다른지 확인 |
-| 재시작·재배포 후에도 이전 주소로 이동 | `tests/concurrency_persistence.rs` (풀 재생성) | Railway에서 Redeploy 후 이전 단축 주소 열기 |
-| 잘못된 URL | `tests/url_validation.rs` | `ftp://x`, `javascript:alert(1)`, 빈 값 입력 → 오류 메시지 |
-| 존재하지 않는 숫자 | `tests/not_found.rs` | `/999999999`, `/0123` 열기 → 404 안내 |
-| 기존 연결 변경 요청 | `tests/immutability_api.rs`, `tests/immutability_db.rs` | 아래 변경 요청 명령 → `405`, 이후 이동 결과 그대로 |
+| 시크릿 창에서 생성하고 복사 | – (화면) | ✅ 생성 → 복사 → "복사했습니다" (직접 확인) |
+| 다른 브라우저에서 단축 주소로 이동 | `tests/issue_and_redirect.rs` | ✅ 복사한 주소로 원본 이동 (직접 확인) |
+| 경로·쿼리·프래그먼트 보존 | `tests/issue_and_redirect.rs` | ✅ `/2` → `301 Location: …/get-started?lang=ko#installing-rust` |
+| 서로 다른 URL 동시 생성 시 충돌 없음 | `tests/concurrency_persistence.rs` (50건) | ✅ 20건 동시 생성 → 모두 `201`, 번호 20개 모두 다름, 각자 원본으로 이동 |
+| 재시작·재배포 후 이전 주소 유지 | `tests/concurrency_persistence.rs` | ✅ 재배포 후 `/1`, `/2`, `/3`, `/23` 그대로 `301`, 새 번호는 이어서 발급 |
+| 잘못된 URL | `tests/url_validation.rs` | ✅ `javascript:alert(1)`, `ftp://x.org/a`, `not a url`, 서비스 자신의 주소 → `400` + 안내 |
+| 존재하지 않는 숫자 | `tests/not_found.rs` | ✅ `/999999999`, `/0123` → `404` 안내 페이지 |
+| 기존 연결 변경 요청 | `tests/immutability_api.rs`, `tests/immutability_db.rs` | ✅ `PUT`·`PATCH`·`DELETE` → `405`, 이후에도 `/2` 이동 결과 그대로 |
 
-동시 요청 (bash):
+<details>
+<summary><b>직접 재현하기</b> (curl)</summary>
+
+생성:
+
+```bash
+curl -i -X POST https://short-url.tbafe.workers.dev/api/links -H 'content-type: application/json' -d '{"url":"https://example.com/a?b=1#c"}'
+```
+
+이동 (경로·쿼리·프래그먼트 확인):
+
+```bash
+curl -i https://short-url.tbafe.workers.dev/2
+```
+
+동시 생성 20건:
 
 ```bash
 for i in $(seq 1 20); do curl -s -X POST https://short-url.tbafe.workers.dev/api/links -H 'content-type: application/json' -d "{\"url\":\"https://example.com/$i\"}" & done; wait
 ```
 
-변경 요청:
+변경 요청 (→ `405`):
 
 ```bash
 curl -i -X PUT https://short-url.tbafe.workers.dev/api/links/1 -H 'content-type: application/json' -d '{"url":"https://evil.example"}'
 ```
 
-### 확인 결과
+없는 번호 (→ `404`):
 
-- **자동 테스트**: `cargo test --features server` 19개가 모두 통과한다. 이 중 DB 통합 테스트는 로컬 Postgres 17로 돌렸다.
-- **로컬 종단 확인**: release 서버 앞에 `wrangler dev`를 두고 확인했다.
-  - 생성 `201`
-  - `/1` → `301 Location: https://example.org/path?q=1#frag`
-  - `/0123`, `/999999` → `404`
-  - `DELETE` → `405`
-  - `ftp://` → `400`
-  - 브라우저로 화면 표시, 생성, 이동(경로·쿼리·프래그먼트 보존), 오류 메시지, 연속 생성을 확인했다.
-- **배포 환경 확인** (`https://short-url.tbafe.workers.dev`, 2026-11-05)
-  - `/api/health` → `200 ok`, `/` → 웹 화면
-  - 생성 `201` → `/2` → `301 Location: https://www.rust-lang.org/learn/get-started?lang=ko#installing-rust` (경로·쿼리·프래그먼트 보존)
-  - `/999999999`, `/0123` → `404` 안내 페이지
-  - `/api/links/2`에 `PUT`·`PATCH`·`DELETE` → `405`, 이후에도 `/2`의 이동 결과가 그대로
-  - `javascript:alert(1)`, `ftp://x.org/a`, `not a url`, 서비스 자신의 주소 → `400`과 오류 메시지
-  - 서로 다른 URL 20건 동시 생성 → 모두 `201`, 번호 20개가 모두 다르고 각각 자기 원본으로 이동
-  - 브라우저에서 화면으로 생성 → 단축 주소 표시
-  - Railway에서 백엔드를 재배포한 뒤 `/1`, `/2`, `/3`, `/23` → 이전과 같은 원본으로 `301`, 새 생성은 다음 번호(`24`)로 `201`
-  - 시크릿 창에서 생성 → 복사 → 다른 브라우저에 붙여 넣어 원본으로 이동 (사람이 직접 확인)
+```bash
+curl -i https://short-url.tbafe.workers.dev/999999999
+```
+
+</details>
+
+## 관련 문서
+
+| 문서 | 내용 |
+| --- | --- |
+| [`GLOSSARY.md`](GLOSSARY.md) | 도메인 용어 (원본 URL, 단축 번호, 단축 주소, 링크, 발급, 이동) |
+| [`docs/adr/0001`](docs/adr/0001-cloudflare-worker-as-public-entry.md) | Cloudflare Worker를 유일한 공개 접점으로 |
+| [`docs/adr/0002`](docs/adr/0002-link-immutability-in-three-layers.md) | 링크 불변성을 세 겹으로 |
+| [`docs/adr/0003`](docs/adr/0003-zero-cost-operation.md) | 비용 0원 운영 |
+| [`docs/cleanup.md`](docs/cleanup.md) | 설치한 도구와 클라우드 리소스 정리 방법 |
+| [`AGENTS.md`](AGENTS.md) | 개발 규칙과 검증 명령 |
