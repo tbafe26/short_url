@@ -11,6 +11,7 @@ use sqlx::PgPool;
 
 use crate::dto::{CreateLinkRequest, LinkResponse};
 use crate::links;
+use crate::validation::validate_original_url;
 
 /// 라우터가 공유하는 상태.
 #[derive(Clone)]
@@ -46,20 +47,27 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// 링크를 발급한다. (검증은 티켓 03에서 추가한다.)
+/// 원본 URL을 서버에서 검증한 뒤 링크를 발급한다. 검증 실패는 400과 오류 메시지로 응답한다.
 async fn create_link(
     State(state): State<AppState>,
     Json(req): Json<CreateLinkRequest>,
-) -> Result<(StatusCode, Json<LinkResponse>), StatusCode> {
-    let link = links::insert(&state.pool, &req.url)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+) -> Response {
+    let original_url = match validate_original_url(&req.url, &state.public_base_url) {
+        Ok(url) => url,
+        Err(e) => {
+            let body = Json(serde_json::json!({ "error": e.to_string() }));
+            return (StatusCode::BAD_REQUEST, body).into_response();
+        }
+    };
+    let Ok(link) = links::insert(&state.pool, &original_url).await else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
     let body = LinkResponse {
         number: link.number,
         short_url: format!("{}/{}", state.public_base_url, link.number),
         original_url: link.original_url,
     };
-    Ok((StatusCode::CREATED, Json(body)))
+    (StatusCode::CREATED, Json(body)).into_response()
 }
 
 /// 단축 번호로 원본 URL에 301 이동한다. (404와 번호 정규형 판정은 티켓 04에서 다룬다.)
