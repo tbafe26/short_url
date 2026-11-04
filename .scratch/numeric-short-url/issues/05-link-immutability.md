@@ -4,8 +4,14 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `PUT`/`PATCH`/`DELETE /api/links/{n}`이 링크 존재 여부와 상관없이 `405`, `Allow` 헤더, 불변성 설명 본문을 응답하고, 이후 이동 결과는 그대로다 (경계 1 테스트)
-- [ ] `BEFORE UPDATE OR DELETE` 행 트리거와 `BEFORE TRUNCATE` 문장 트리거가 마이그레이션으로 추가된다
-- [ ] 직접 SQL `UPDATE`·`DELETE`·`TRUNCATE`와 번호를 지정한 `INSERT`가 모두 실패하고 데이터가 그대로다 (경계 2 테스트)
+- [x] `PUT`/`PATCH`/`DELETE /api/links/{n}`이 링크 존재 여부와 상관없이 `405`, `Allow` 헤더, 불변성 설명 본문을 응답하고, 이후 이동 결과는 그대로다 (경계 1 테스트)
+- [x] `BEFORE UPDATE OR DELETE` 행 트리거와 `BEFORE TRUNCATE` 문장 트리거가 마이그레이션으로 추가된다
+- [x] 직접 SQL `UPDATE`·`DELETE`·`TRUNCATE`와 번호를 지정한 `INSERT`가 모두 실패하고 데이터가 그대로다 (경계 2 테스트)
+
+## Comments
+
+- 서브에이전트 생성이 자동 권한 검사로 막혀 메인 세션에서 직접 구현했다. 테스트를 먼저 써서 실패(405 4건 중 0 통과, DB 3건 실패)를 확인한 뒤 구현했다. 번호를 지정한 INSERT는 0001의 `GENERATED ALWAYS`가 이미 거부하고 있었다.
+- `/api/links/{n}`에는 허용되는 메서드가 없으므로 `Allow` 헤더는 빈 값이다 (RFC 9110 §10.2.1).
+- fmt, clippy 두 종, test 통과. `dx build --release`는 07까지 병합한 뒤 통합 브랜치에서 한 번에 확인한다.
