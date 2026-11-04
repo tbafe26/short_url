@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-dioxus = { version = "=0.7.10", features = ["fullstack"] }
+# fullstack 기능은 서버 빌드에만 켠다. 웹 빌드에 켜면 hydration 코드가 들어가서,
+# Worker가 주는 정적 index.html(서버 렌더링 데이터 없음)에서 화면이 뜨지 않는다 (ADR-0001).
+dioxus = { version = "=0.7.10" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
@@ -25,7 +27,7 @@ http-body-util = "0.1"
 [features]
 default = []
 web = ["dioxus/web", "dep:gloo-net"]
-server = ["dioxus/server", "dep:anyhow", "dep:axum", "dep:tokio", "dep:sqlx"]
+server = ["dioxus/server", "dioxus/fullstack", "dep:anyhow", "dep:axum", "dep:tokio", "dep:sqlx"]
 
 # 디스크 절약: 디버거 정보와 증분 캐시를 남기지 않는다 (패닉 위치 표시는 유지된다)
 [profile.dev]

@@ -22,7 +22,8 @@ COPY src ./src
 # `sqlx::migrate!`가 컴파일 시점에 마이그레이션을 실행 파일에 넣는다.
 COPY migrations ./migrations
 
-RUN dx build --release
+# fullstack 기능이 server 기능에만 있으므로 풀스택 빌드(서버 + 클라이언트)를 명시한다.
+RUN dx build --release --fullstack
 
 # ---- 2단계: 실행 ----
 FROM debian:bookworm-slim AS runtime

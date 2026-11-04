@@ -13,6 +13,8 @@ fn main() {
     });
 
     // 브라우저 빌드: 화면만 띄운다.
+    // 공개 화면은 Cloudflare Worker가 정적 index.html로 제공하므로 서버 렌더링 결과(hydration 데이터)가 없다.
+    // 그래서 웹 빌드에는 fullstack(hydration)을 넣지 않고 클라이언트에서 처음부터 렌더링한다 (Cargo.toml 참고).
     #[cfg(not(feature = "server"))]
     dioxus::launch(app);
 }
@@ -113,6 +115,7 @@ fn app() -> Element {
     };
 
     rsx! {
+        document::Title { "{SERVICE_TITLE}" }
         main {
             h1 { "{SERVICE_TITLE}" }
             input {
