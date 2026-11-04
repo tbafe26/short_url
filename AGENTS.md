@@ -53,7 +53,7 @@ cargo fmt --all -- --check
 cargo clippy --features server --all-targets -- -D warnings
 cargo clippy --features web --target wasm32-unknown-unknown -- -D warnings
 cargo test --features server
-dx build --release
+dx build --release --fullstack
 npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 ```
 
@@ -62,8 +62,10 @@ npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
   - `DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url` (셸 환경변수나 `.env`로 지정)
   - 여러 에이전트가 동시에 테스트하면 `#[sqlx::test]`의 테스트 DB 이름이 충돌한다. 에이전트마다 기준 DB를 따로 만들어(`docker exec short-url-pg createdb -U postgres short_url_<이름>`) `DATABASE_URL`의 DB 이름을 바꾼다.
 - 디스크 여유가 적다. `[profile.dev]`의 `debug = 0`, `incremental = false`를 유지하고, 로컬 `docker build`처럼 수 GB를 쓰는 작업은 사용자에게 먼저 묻는다.
-- 기능 플래그: `server`(서버·DB), `web`(브라우저 WASM). `default`는 비어 있고 `dx`가 플랫폼에 맞춰 자동으로 켠다.
-- `dx build --release`는 서버와 WASM을 모두 release로 빌드해 첫 실행에 15분 정도 걸린다. 셸 타임아웃을 넉넉히 잡고 백그라운드로 돌린다.
+- 기능 플래그: `server`(서버·DB, `dioxus/fullstack` 포함), `web`(브라우저 WASM). `default`는 비어 있고 `dx`가 플랫폼에 맞춰 자동으로 켠다.
+- `dioxus/fullstack`을 `web` 쪽에 켜지 않는다. 웹 번들에 hydration 코드가 들어가면, Worker가 주는 정적 `index.html`에서 화면이 빈 채로 멈춘다. 그래서 `dx`가 풀스택을 자동 감지하지 못하므로 빌드할 때 `--fullstack`을 명시한다.
+- `dx build --release --fullstack`은 서버와 WASM을 모두 release로 빌드해 첫 실행에 15분 정도 걸린다. 셸 타임아웃을 넉넉히 잡고 백그라운드로 돌린다.
+- 웹 번들 출력(`target/dx/short_url/release/web/public`)에는 이전 빌드의 자산이 쌓인다. Worker 배포 전에는 그 폴더를 지우고 다시 빌드한다.
 - `dx serve`/`cargo test` 전에 서로의 `target` 잠금을 피하려면 `dx serve`를 먼저 끈다.
 - API는 `src/api.rs`의 `api_router()`에 모으고, `src/main.rs`가 Dioxus 서버 라우터에 합친다. 테스트는 이 라우터를 `tower::ServiceExt::oneshot`으로 직접 호출한다.
 - DB 통합 테스트에는 다음 시나리오를 포함한다.
