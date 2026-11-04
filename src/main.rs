@@ -64,18 +64,38 @@ async fn request_link(_url: String) -> Result<LinkResponse, String> {
     Err("브라우저에서만 생성할 수 있다".to_string())
 }
 
+/// 단축 주소를 클립보드에 복사한다. 성공하면 true.
+/// web-sys의 불안정 API 대신 브라우저의 `navigator.clipboard`를 eval로 호출한다.
+async fn copy_to_clipboard(text: String) -> bool {
+    let script = format!(
+        "try {{ await navigator.clipboard.writeText({}); return true; }} catch (e) {{ return false; }}",
+        serde_json::to_string(&text).unwrap_or_default()
+    );
+    document::eval(&script)
+        .join::<bool>()
+        .await
+        .unwrap_or(false)
+}
+
 /// 생성 화면: 원본 URL을 입력하고 단축 주소를 받는다.
 fn app() -> Element {
     let mut input = use_signal(String::new);
     let mut result = use_signal(|| None::<LinkResponse>);
     let mut error = use_signal(|| None::<String>);
     let mut busy = use_signal(|| false);
+    // 복사 결과: None이면 표시 없음, Some(true)는 성공, Some(false)는 실패.
+    let mut copied = use_signal(|| None::<bool>);
 
     let submit = move |_| {
+        // 진행 중에는 중복 요청을 막는다.
+        if *busy.read() {
+            return;
+        }
         let url = input.read().clone();
         spawn(async move {
             busy.set(true);
             error.set(None);
+            copied.set(None);
             match request_link(url).await {
                 Ok(link) => result.set(Some(link)),
                 Err(message) => error.set(Some(message)),
@@ -103,6 +123,24 @@ fn app() -> Element {
                 p {
                     "단축 주소: "
                     a { href: "{link.short_url}", "{link.short_url}" }
+                }
+                button {
+                    onclick: move |_| {
+                        let text = link.short_url.clone();
+                        spawn(async move {
+                            copied.set(Some(copy_to_clipboard(text).await));
+                        });
+                    },
+                    "복사"
+                }
+                match *copied.read() {
+                    Some(true) => rsx! {
+                        span { role: "status", "복사했다" }
+                    },
+                    Some(false) => rsx! {
+                        span { role: "status", "복사하지 못했다" }
+                    },
+                    None => rsx! {},
                 }
             }
         }
