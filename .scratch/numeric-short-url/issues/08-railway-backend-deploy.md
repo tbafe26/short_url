@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] 멀티스테이지 `Dockerfile`(cargo-chef 캐시, 최종 단계는 실행 파일과 필요한 자산만)이 있고 로컬에서 `docker build`가 성공한다
+- [ ] 멀티스테이지 `Dockerfile`(cargo-chef 캐시, 최종 단계는 실행 파일과 `public/`만)이 있다. 디스크 여유가 부족해 로컬 `docker build`는 하지 않고, 정적 검토(베이스 이미지·단계별 COPY 경로·`dx` 산출물 위치·`IP`/`PORT`)로 확인한다. 실제 빌드는 Railway 첫 배포에서 확인한다
 - [ ] Railway 설정 파일에 Dockerfile 빌드와 헬스 체크 경로(`/api/health`)가 지정되어 있고, 헬스 체크 엔드포인트가 구현되어 있다
 - [ ] 서버가 Railway가 주입하는 `PORT`로 `0.0.0.0`에 바인드한다
 - [ ] 비밀 값이 저장소에 없다
