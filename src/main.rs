@@ -64,14 +64,14 @@ async fn request_link(url: String) -> Result<LinkResponse, String> {
             .unwrap_or("올바르지 않은 요청입니다.");
         Err(message.to_string())
     } else {
-        Err(format!("생성하지 못했다 (상태 {})", res.status()))
+        Err(format!("생성하지 못했습니다 (상태 {})", res.status()))
     }
 }
 
 /// 브라우저가 아닌 빌드(서버 렌더링)에서는 호출되지 않는다.
 #[cfg(not(feature = "web"))]
 async fn request_link(_url: String) -> Result<LinkResponse, String> {
-    Err("브라우저에서만 생성할 수 있다".to_string())
+    Err("브라우저에서만 생성할 수 있습니다.".to_string())
 }
 
 /// 단축 주소를 클립보드에 복사한다. 성공하면 true.
@@ -146,10 +146,10 @@ fn app() -> Element {
                 }
                 match *copied.read() {
                     Some(true) => rsx! {
-                        span { role: "status", "복사했다" }
+                        span { role: "status", "복사했습니다" }
                     },
                     Some(false) => rsx! {
-                        span { role: "status", "복사하지 못했다" }
+                        span { role: "status", "복사하지 못했습니다" }
                     },
                     None => rsx! {},
                 }

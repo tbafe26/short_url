@@ -17,6 +17,7 @@
   "vars": {
     // Railway 백엔드 공개 주소 (끝에 `/` 없이). 배포 전에 실제 주소로 바꾸거나
     // `npx wrangler deploy --var BACKEND_ORIGIN:https://...`로 덮어쓴다.
-    "BACKEND_ORIGIN": "https://short-url-backend.up.railway.app"
+    // 자리표시는 예약 도메인(.invalid)이라 바꾸지 않고 배포하면 남의 서버가 아니라 연결 오류가 난다.
+    "BACKEND_ORIGIN": "https://replace-with-railway-backend.invalid"
   }
 }
