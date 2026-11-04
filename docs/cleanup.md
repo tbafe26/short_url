@@ -10,6 +10,7 @@ Node.js, Git, Docker Desktop, winget, `C:\Program Files (x86)\Microsoft Visual S
 
 | 대상 | 정리 방법 |
 | --- | --- |
+| GitHub 저장소 `tbafe26/short_url` (공개) | 제출·채점에 필요하므로 남겨 둔다. 지우려면 GitHub 저장소 Settings → Danger Zone → Delete this repository |
 | Railway 프로젝트 (백엔드 + Postgres) | Railway 대시보드 → 프로젝트 → Settings → Delete Project |
 | Cloudflare Worker | Cloudflare 대시보드 → Workers & Pages → 해당 Worker → Settings → Delete |
 | wrangler 로그인 정보 | `npx wrangler logout` |
