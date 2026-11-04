@@ -42,6 +42,7 @@ Dioxus 풀스택(Rust)으로 만드는 숫자형 단축 URL 서비스. 웹 화�
 - DB 접속 정보와 Railway 주소는 환경변수로만 받는다. 저장소에는 `.env.example`에 변수 이름만 둔다.
 - 브라우저 번들(WASM)과 `wrangler.jsonc`에는 공개해도 되는 값만 넣는다.
 - 유료 플랜, 유료 도메인, 카드 등록이 필요한 설정은 추가하지 않는다 (ADR-0003). 필요하면 사용자에게 묻는다.
+- 새 개발 도구·Docker 컨테이너·클라우드 리소스를 설치하거나 만들면 `docs/cleanup.md`에 정리 방법과 함께 적는다.
 
 ## 검증 명령
 
@@ -60,6 +61,7 @@ npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
   - 로컬 Postgres: `docker run -d --name short-url-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=short_url -p 5432:5432 postgres:17`
   - `DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url` (셸 환경변수나 `.env`로 지정)
 - 기능 플래그: `server`(서버·DB), `web`(브라우저 WASM). `default`는 비어 있고 `dx`가 플랫폼에 맞춰 자동으로 켠다.
+- `dx build --release`는 서버와 WASM을 모두 release로 빌드해 첫 실행에 15분 정도 걸린다. 셸 타임아웃을 넉넉히 잡고 백그라운드로 돌린다.
 - `dx serve`/`cargo test` 전에 서로의 `target` 잠금을 피하려면 `dx serve`를 먼저 끈다.
 - API는 `src/api.rs`의 `api_router()`에 모으고, `src/main.rs`가 Dioxus 서버 라우터에 합친다. 테스트는 이 라우터를 `tower::ServiceExt::oneshot`으로 직접 호출한다.
 - DB 통합 테스트에는 다음 시나리오를 포함한다.
