@@ -2,11 +2,9 @@
 
 ## 배포 URL
 
-- 서비스 URL: https://short.example
-- 테스트 단축 URL: https://short.example/123
-- 테스트 원본 URL: https://example.org
-
-> ⚠️ 위 세 주소는 아직 예시 값이다. Railway·Cloudflare에 배포한 뒤 실제 서비스 URL(Cloudflare `workers.dev` 주소)과, 그 서비스에서 실제로 만든 단축 URL과 원본 URL로 바꾼다. 바꾼 뒤에는 이 안내문을 지운다.
+- 서비스 URL: https://short-url.tbafe.workers.dev
+- 테스트 단축 URL: https://short-url.tbafe.workers.dev/2
+- 테스트 원본 URL: https://www.rust-lang.org/learn/get-started?lang=ko#installing-rust
 
 로그인 없이 긴 URL을 `/123`처럼 숫자로만 된 단축 주소로 바꾸는 서비스다. 한 번 발급한 단축 번호와 원본 URL의 연결(링크)은 바꾸거나 지울 수 없다. 용어는 [GLOSSARY.md](GLOSSARY.md)를, 설계 결정은 [docs/adr/](docs/adr/)를 따른다.
 
@@ -179,8 +177,10 @@ npx wrangler login
 백엔드 주소를 넣어 배포한다.
 
 ```bash
-npx wrangler deploy --config cloudflare/wrangler.jsonc --var BACKEND_ORIGIN:https://<백엔드>.up.railway.app
+npx wrangler deploy --config cloudflare/wrangler.jsonc
 ```
+
+`wrangler.jsonc`의 `vars.BACKEND_ORIGIN`에 지금 쓰는 백엔드 주소(`https://shorturl-production-fb10.up.railway.app`)가 들어 있다. 공개 주소라 비밀 값이 아니다. 다른 백엔드를 가리키려면 `--var BACKEND_ORIGIN:https://<백엔드>.up.railway.app`을 붙인다.
 
 배포가 끝나면 `https://short-url.<계정>.workers.dev`가 출력된다. 이 주소를 Railway의 `PUBLIC_BASE_URL`에 넣는다.
 
@@ -210,18 +210,18 @@ npx wrangler deploy --config cloudflare/wrangler.jsonc --var BACKEND_ORIGIN:http
 동시 요청 (bash):
 
 ```bash
-for i in $(seq 1 20); do curl -s -X POST https://<서비스>/api/links -H 'content-type: application/json' -d "{\"url\":\"https://example.com/$i\"}" & done; wait
+for i in $(seq 1 20); do curl -s -X POST https://short-url.tbafe.workers.dev/api/links -H 'content-type: application/json' -d "{\"url\":\"https://example.com/$i\"}" & done; wait
 ```
 
 변경 요청:
 
 ```bash
-curl -i -X PUT https://<서비스>/api/links/1 -H 'content-type: application/json' -d '{"url":"https://evil.example"}'
+curl -i -X PUT https://short-url.tbafe.workers.dev/api/links/1 -H 'content-type: application/json' -d '{"url":"https://evil.example"}'
 ```
 
 ### 확인 결과
 
-- **자동 테스트**: `cargo test --features server` 18개가 모두 통과한다. 이 중 DB 통합 테스트는 로컬 Postgres 17로 돌렸다.
+- **자동 테스트**: `cargo test --features server` 19개가 모두 통과한다. 이 중 DB 통합 테스트는 로컬 Postgres 17로 돌렸다.
 - **로컬 종단 확인**: release 서버 앞에 `wrangler dev`를 두고 확인했다.
   - 생성 `201`
   - `/1` → `301 Location: https://example.org/path?q=1#frag`
@@ -229,6 +229,14 @@ curl -i -X PUT https://<서비스>/api/links/1 -H 'content-type: application/jso
   - `DELETE` → `405`
   - `ftp://` → `400`
   - 브라우저로 화면 표시, 생성, 이동(경로·쿼리·프래그먼트 보존), 오류 메시지, 연속 생성을 확인했다.
+- **배포 환경 확인** (`https://short-url.tbafe.workers.dev`, 2026-11-05)
+  - `/api/health` → `200 ok`, `/` → 웹 화면
+  - 생성 `201` → `/2` → `301 Location: https://www.rust-lang.org/learn/get-started?lang=ko#installing-rust` (경로·쿼리·프래그먼트 보존)
+  - `/999999999`, `/0123` → `404` 안내 페이지
+  - `/api/links/2`에 `PUT`·`PATCH`·`DELETE` → `405`, 이후에도 `/2`의 이동 결과가 그대로
+  - `javascript:alert(1)`, `ftp://x.org/a`, `not a url`, 서비스 자신의 주소 → `400`과 오류 메시지
+  - 서로 다른 URL 20건 동시 생성 → 모두 `201`, 번호 20개가 모두 다르고 각각 자기 원본으로 이동
+  - 브라우저에서 화면으로 생성 → 단축 주소 표시
 - **확인하지 않은 것**
   - 실제 클립보드 복사: 테스트 브라우저에 클립보드 권한이 없어서, 복사 함수에 단축 주소가 전달되는 것까지만 확인했다.
-  - 배포 환경의 외부 접속, 재배포, 동시 요청: 배포 후 위 재현 방법으로 확인한다.
+  - 배포 환경에서 Railway 재배포 후 이전 주소 이동: Railway에서 Redeploy한 뒤 `/2`를 열어 확인한다.
