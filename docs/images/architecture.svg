@@ -7,9 +7,10 @@
     <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
     </marker>
+    <!-- 사람 아이콘: 흰 채움이라 겹쳐 그리면 앞사람이 뒷사람을 가린다 -->
     <g id="person">
-      <circle cx="0" cy="-12" r="11" fill="none" stroke="#1f2433" stroke-width="3"/>
-      <path d="M-20,20 a20,18 0 0 1 40,0 z" fill="none" stroke="#1f2433" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="0" cy="-12" r="11" fill="#ffffff" stroke="#1f2433" stroke-width="3"/>
+      <path d="M-20,20 a20,18 0 0 1 40,0 z" fill="#ffffff" stroke="#1f2433" stroke-width="3" stroke-linejoin="round"/>
     </g>
   </defs>
 
@@ -21,14 +22,8 @@
   <text x="80" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="#1f2433">개발자</text>
 
   <!-- GitHub -->
-  <circle cx="300" cy="68" r="28" fill="#1f2433"/>
-  <g stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round">
-    <line x1="291" y1="55" x2="291" y2="81"/>
-    <path d="M309,59 v5 a9,9 0 0 1 -9,9 h-9"/>
-  </g>
-  <circle cx="291" cy="54" r="4" fill="#ffffff"/>
-  <circle cx="291" cy="83" r="4" fill="#ffffff"/>
-  <circle cx="309" cy="56" r="4" fill="#ffffff"/>
+  <!-- GitHub 마크 (Primer Octicons mark-github, MIT) -->
+  <path transform="translate(272,40) scale(3.5)" fill="#1f2433" d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/>
   <text x="300" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="#1f2433">GitHub</text>
 
   <!-- 배포 흐름 (점선) -->
@@ -40,12 +35,13 @@
   <text x="240" y="142" text-anchor="middle" font-size="13" fill="#5b6273">wrangler deploy</text>
 
   <!-- 사용자 -->
-  <g transform="translate(80,300)">
-    <use href="#person" x="-24" y="-8"/>
-    <use href="#person" x="24" y="-8"/>
-    <g transform="translate(0,22)"><use href="#person"/></g>
+  <!-- 뒤에 두 명, 앞에 한 명 -->
+  <g transform="translate(80,290)">
+    <use href="#person" x="-26" y="-14"/>
+    <use href="#person" x="26" y="-14"/>
+    <use href="#person" x="0" y="38"/>
   </g>
-  <text x="80" y="370" text-anchor="middle" font-size="16" font-weight="600" fill="#1f2433">사용자</text>
+  <text x="80" y="376" text-anchor="middle" font-size="16" font-weight="600" fill="#1f2433">사용자</text>
   <line x1="130" y1="290" x2="248" y2="290" stroke="#1f2433" stroke-width="2.2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
   <text x="189" y="280" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2433">HTTPS</text>
 
@@ -56,7 +52,7 @@
     <line x1="-22" y1="0" x2="22" y2="0" stroke="#1f2433" stroke-width="2"/>
   </g>
   <text x="80" y="504" text-anchor="middle" font-size="16" font-weight="600" fill="#1f2433">원본 사이트</text>
-  <line x1="80" y1="382" x2="80" y2="432" stroke="#1f2433" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="80" y1="388" x2="80" y2="432" stroke="#1f2433" stroke-width="2.2" marker-end="url(#arrow)"/>
   <text x="94" y="412" font-size="13" fill="#1f2433">301 이동</text>
 
   <!-- Cloudflare -->
