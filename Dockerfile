@@ -7,7 +7,9 @@
 # cargo-chef의 의존성 사전 빌드 결과를 재사용하지 못하기 때문이다.
 
 # ---- 1단계: 빌드 ----
-FROM rust:1-bookworm AS builder
+# trixie(Debian 13, glibc 2.41)를 쓴다. cargo-binstall로 받는 dx 0.7.10 바이너리가
+# glibc 2.39 이상을 요구해서 bookworm(glibc 2.36)에서는 실행되지 않는다.
+FROM rust:1-trixie AS builder
 
 # dx는 소스 빌드가 오래 걸리므로 cargo-binstall로 미리 빌드된 바이너리를 받는다.
 # 라이브러리 버전(Cargo.toml의 dioxus =0.7.10)과 같은 버전으로 고정한다.
@@ -26,7 +28,8 @@ COPY migrations ./migrations
 RUN dx build --release --fullstack
 
 # ---- 2단계: 실행 ----
-FROM debian:bookworm-slim AS runtime
+# 서버 실행 파일은 빌드 단계의 glibc 이상이 필요하므로 같은 trixie를 쓴다.
+FROM debian:trixie-slim AS runtime
 
 # DB 접속(rustls)에 쓸 루트 인증서
 RUN apt-get update \
