@@ -53,6 +53,14 @@ async fn request_link(url: String) -> Result<LinkResponse, String> {
     let res = req.send().await.map_err(|e| e.to_string())?;
     if res.status() == 201 {
         res.json::<LinkResponse>().await.map_err(|e| e.to_string())
+    } else if res.status() == 400 {
+        // 서버가 보낸 검증 오류 메시지를 그대로 보여 준다.
+        let body = res.json::<serde_json::Value>().await.ok();
+        let message = body
+            .as_ref()
+            .and_then(|v| v["error"].as_str())
+            .unwrap_or("올바르지 않은 요청입니다.");
+        Err(message.to_string())
     } else {
         Err(format!("생성하지 못했다 (상태 {})", res.status()))
     }

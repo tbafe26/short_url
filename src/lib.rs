@@ -2,6 +2,7 @@
 
 pub mod dto;
 pub mod short_number;
+pub mod validation;
 
 #[cfg(feature = "server")]
 pub mod api;
