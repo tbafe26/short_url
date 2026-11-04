@@ -19,8 +19,10 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf \
     && rustup target add wasm32-unknown-unknown
 
 WORKDIR /app
-COPY Cargo.toml Cargo.lock build.rs ./
+COPY Cargo.toml Cargo.lock build.rs Dioxus.toml index.html ./
 COPY src ./src
+# 화면 스타일(asset!로 웹 번들에 들어간다)
+COPY assets ./assets
 # `sqlx::migrate!`가 컴파일 시점에 마이그레이션을 실행 파일에 넣는다.
 COPY migrations ./migrations
 

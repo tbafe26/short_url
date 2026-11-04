@@ -87,6 +87,12 @@ async fn copy_to_clipboard(text: String) -> bool {
         .unwrap_or(false)
 }
 
+/// 화면 스타일. 정적 index.html의 head에 들어가 WASM이 뜨기 전부터 적용된다.
+const MAIN_CSS: Asset = asset!(
+    "/assets/main.css",
+    AssetOptions::css().with_static_head(true)
+);
+
 /// 생성 화면: 원본 URL을 입력하고 단축 주소를 받는다.
 fn app() -> Element {
     let mut input = use_signal(String::new);
@@ -96,7 +102,9 @@ fn app() -> Element {
     // 복사 결과: None이면 표시 없음, Some(true)는 성공, Some(false)는 실패.
     let mut copied = use_signal(|| None::<bool>);
 
-    let submit = move |_| {
+    // 버튼 클릭과 입력란의 Enter 모두 폼 제출로 처리한다.
+    let submit = move |event: FormEvent| {
+        event.prevent_default();
         // 진행 중에는 중복 요청을 막는다.
         if *busy.read() {
             return;
@@ -107,7 +115,11 @@ fn app() -> Element {
             error.set(None);
             copied.set(None);
             match request_link(url).await {
-                Ok(link) => result.set(Some(link)),
+                Ok(link) => {
+                    result.set(Some(link));
+                    // 다음 주소를 바로 넣을 수 있게 비운다. 방금 넣은 원본은 결과에 보인다.
+                    input.set(String::new());
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -116,44 +128,94 @@ fn app() -> Element {
 
     rsx! {
         document::Title { "{SERVICE_TITLE}" }
-        main {
-            h1 { "{SERVICE_TITLE}" }
-            input {
-                r#type: "text",
-                placeholder: "https://example.com/...",
-                value: "{input}",
-                oninput: move |e| input.set(e.value()),
-            }
-            button { disabled: *busy.read(), onclick: submit,
-                if *busy.read() { "생성 중..." } else { "생성" }
-            }
-            if let Some(message) = error.read().clone() {
-                p { role: "alert", "{message}" }
-            }
-            if let Some(link) = result.read().clone() {
-                p {
-                    "단축 주소: "
-                    a { href: "{link.short_url}", "{link.short_url}" }
-                }
-                button {
-                    onclick: move |_| {
-                        let text = link.short_url.clone();
-                        spawn(async move {
-                            copied.set(Some(copy_to_clipboard(text).await));
-                        });
-                    },
-                    "복사"
-                }
-                match *copied.read() {
-                    Some(true) => rsx! {
-                        span { role: "status", "복사했습니다" }
-                    },
-                    Some(false) => rsx! {
-                        span { role: "status", "복사하지 못했습니다" }
-                    },
-                    None => rsx! {},
+        document::Stylesheet { href: MAIN_CSS }
+        main { class: "page",
+            header { class: "hero",
+                p { class: "eyebrow", "로그인 없이, 숫자로만" }
+                h1 { "{SERVICE_TITLE}" }
+                p { class: "lead",
+                    "긴 주소를 "
+                    code { "/123" }
+                    " 같은 짧은 숫자 주소로 바꿔 드립니다."
                 }
             }
+            section { class: "card",
+                form { class: "form", onsubmit: submit,
+                    label { r#for: "original-url", "원본 URL" }
+                    div { class: "row",
+                        input {
+                            id: "original-url",
+                            r#type: "text",
+                            inputmode: "url",
+                            autocomplete: "off",
+                            spellcheck: "false",
+                            placeholder: "https://example.com/긴/주소?검색=값",
+                            value: "{input}",
+                            oninput: move |e| input.set(e.value()),
+                        }
+                        button {
+                            class: "btn btn-primary",
+                            r#type: "submit",
+                            disabled: *busy.read(),
+                            if *busy.read() { "생성 중..." } else { "단축하기" }
+                        }
+                    }
+                    p { class: "hint", "http 또는 https 주소를 넣어 주세요. 같은 주소도 넣을 때마다 새 번호가 발급됩니다." }
+                }
+                if let Some(message) = error.read().clone() {
+                    p { class: "error", role: "alert", "{message}" }
+                }
+                if let Some(link) = result.read().clone() {
+                    div { class: "result",
+                        p { class: "result-label", "단축 주소가 만들어졌습니다" }
+                        div { class: "row",
+                            a {
+                                class: "short-link",
+                                href: "{link.short_url}",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                "{link.short_url}"
+                            }
+                            button {
+                                class: "btn btn-secondary",
+                                r#type: "button",
+                                onclick: move |_| {
+                                    let text = link.short_url.clone();
+                                    spawn(async move {
+                                        copied.set(Some(copy_to_clipboard(text).await));
+                                    });
+                                },
+                                "복사"
+                            }
+                        }
+                        p { class: "original", "원본: {link.original_url}" }
+                        match *copied.read() {
+                            Some(true) => rsx! {
+                                span { class: "copy-status ok", role: "status", "복사했습니다" }
+                            },
+                            Some(false) => rsx! {
+                                span { class: "copy-status fail", role: "status", "복사하지 못했습니다" }
+                            },
+                            None => rsx! {},
+                        }
+                    }
+                }
+            }
+            ul { class: "features",
+                li {
+                    strong { "숫자로만 된 주소" }
+                    span { "주소 끝은 /123처럼 숫자만 씁니다." }
+                }
+                li {
+                    strong { "바뀌지 않는 링크" }
+                    span { "한 번 만든 주소는 수정·삭제되지 않습니다." }
+                }
+                li {
+                    strong { "주소 그대로 이동" }
+                    span { "경로, 검색어, # 뒤까지 원본 그대로 이동합니다." }
+                }
+            }
+            p { class: "footer", "만든 주소는 누구나 열 수 있으니 개인 정보가 담긴 주소는 넣지 마세요." }
         }
     }
 }

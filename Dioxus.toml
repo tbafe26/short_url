@@ -1,0 +1,4 @@
+# dx(Dioxus CLI) 설정. 웹 번들의 정적 index.html 제목만 지정한다.
+# Worker가 주는 정적 index.html은 WASM이 뜨기 전에 보이므로, 탭 제목도 여기서 정해야 한다.
+[web.app]
+title = "숫자형 단축 URL"

@@ -22,6 +22,7 @@
 | 위치 | 역할 | 주요 파일 |
 | --- | --- | --- |
 | Cloudflare Worker | 공개 HTTPS 접점, 웹 화면 제공, API·이동 프록시 | `cloudflare/wrangler.jsonc`, `cloudflare/src/worker.js` |
+| 웹 화면 (Dioxus WASM) | 원본 URL 입력, 단축 주소 표시·복사 | `src/main.rs`, `assets/main.css`, `index.html`, `Dioxus.toml` |
 | Railway 백엔드 | 링크 생성 API, 301 이동, 404 안내, 변경 거부 | `Dockerfile`, `railway.json`, `src/` |
 | Railway Postgres | 링크 영구 저장 | `migrations/` |
 
@@ -238,5 +239,4 @@ curl -i -X PUT https://short-url.tbafe.workers.dev/api/links/1 -H 'content-type:
   - 서로 다른 URL 20건 동시 생성 → 모두 `201`, 번호 20개가 모두 다르고 각각 자기 원본으로 이동
   - 브라우저에서 화면으로 생성 → 단축 주소 표시
   - Railway에서 백엔드를 재배포한 뒤 `/1`, `/2`, `/3`, `/23` → 이전과 같은 원본으로 `301`, 새 생성은 다음 번호(`24`)로 `201`
-- **확인하지 않은 것**
-  - 실제 클립보드 복사: 테스트 브라우저에 클립보드 권한이 없어서, 복사 함수에 단축 주소가 전달되는 것까지만 확인했다.
+  - 시크릿 창에서 생성 → 복사 → 다른 브라우저에 붙여 넣어 원본으로 이동 (사람이 직접 확인)
