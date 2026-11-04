@@ -8,6 +8,12 @@
 
 로그인 없이 긴 URL을 `/123`처럼 숫자로만 된 단축 주소로 바꾸는 서비스다. 한 번 발급한 단축 번호와 원본 URL의 연결(링크)은 바꾸거나 지울 수 없다. 용어는 [GLOSSARY.md](GLOSSARY.md)를, 설계 결정은 [docs/adr/](docs/adr/)를 따른다.
 
+## 화면
+
+단축 주소를 만들고 복사한 뒤의 화면이다. 원본 URL을 넣고 **단축하기**를 누르면 단축 주소와 원본이 나오고, **복사**로 클립보드에 담는다.
+
+![단축 주소를 만들고 복사한 뒤의 화면](docs/images/result.png)
+
 ## 구성
 
 ```
@@ -93,6 +99,8 @@ docker run -d --name short-url-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=s
 ### 환경변수
 
 [.env.example](.env.example)에 이름만 있다. 실제 값은 셸 환경변수나 배포 환경에 넣는다.
+
+**비밀 값은 저장소에 없다.** DB 접속 정보는 Railway 변수에서 `${{Postgres.DATABASE_URL}}` 참조로만 전달되고, `.env`는 `.gitignore`로 제외된다. 브라우저 번들(WASM)과 `cloudflare/wrangler.jsonc`에는 공개 주소(`BACKEND_ORIGIN`)만 들어 있다.
 
 | 변수 | 위치 | 설명 |
 | --- | --- | --- |
