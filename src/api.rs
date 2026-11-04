@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use sqlx::PgPool;
 
@@ -39,6 +39,13 @@ pub fn api_router(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/links", post(create_link))
+        // 링크는 불변이다 (ADR-0002): 변경 요청은 명시적으로 405로 거부한다.
+        .route(
+            "/api/links/{number}",
+            put(reject_change)
+                .patch(reject_change)
+                .delete(reject_change),
+        )
         .route("/{segment}", get(redirect))
         .with_state(state)
 }
@@ -69,6 +76,20 @@ async fn create_link(
         original_url: link.original_url,
     };
     (StatusCode::CREATED, Json(body)).into_response()
+}
+
+/// 링크 변경 요청(`PUT`/`PATCH`/`DELETE`)을 거부한다. 링크 존재 여부와 상관없이 항상 같다.
+/// 이 경로에서 허용되는 메서드가 없으므로 `Allow` 헤더는 빈 값이다 (RFC 9110 §10.2.1).
+async fn reject_change() -> Response {
+    let body = Json(serde_json::json!({
+        "error": "링크는 발급 후 변경할 수 없습니다. 수정·삭제는 지원하지 않습니다."
+    }));
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        [(header::ALLOW, HeaderValue::from_static(""))],
+        body,
+    )
+        .into_response()
 }
 
 /// 단축 번호로 원본 URL에 301 이동한다. 정규형이 아니거나 없는 번호는 404 안내 페이지로 응답한다.
