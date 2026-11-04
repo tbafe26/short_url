@@ -1,0 +1,12 @@
+# 빌드 컨텍스트에서 제외: 빌드 산출물, 비밀 값, 문서·이슈, 에이전트 작업 폴더
+target/
+.git/
+.claude/
+.scratch/
+docs/
+tests/
+cloudflare/
+node_modules/
+.wrangler/
+.env
+*.log
