@@ -56,7 +56,12 @@ dx build --release
 npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 ```
 
-- `cargo test`의 DB 통합 테스트는 로컬 Postgres를 가리키는 `DATABASE_URL`이 필요하다.
+- `cargo test`의 DB 통합 테스트는 로컬 Postgres를 가리키는 `DATABASE_URL`이 필요하다. `#[sqlx::test]`가 테스트마다 DB를 만들므로 DB 생성 권한이 있는 계정을 쓴다.
+  - 로컬 Postgres: `docker run -d --name short-url-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=short_url -p 5432:5432 postgres:17`
+  - `DATABASE_URL=postgres://postgres:postgres@localhost:5432/short_url` (셸 환경변수나 `.env`로 지정)
+- 기능 플래그: `server`(서버·DB), `web`(브라우저 WASM). `default`는 비어 있고 `dx`가 플랫폼에 맞춰 자동으로 켠다.
+- `dx serve`/`cargo test` 전에 서로의 `target` 잠금을 피하려면 `dx serve`를 먼저 끈다.
+- API는 `src/api.rs`의 `api_router()`에 모으고, `src/main.rs`가 Dioxus 서버 라우터에 합친다. 테스트는 이 라우터를 `tower::ServiceExt::oneshot`으로 직접 호출한다.
 - DB 통합 테스트에는 다음 시나리오를 포함한다.
   - 동시 생성 요청 시 번호 충돌이 없음
   - UPDATE/DELETE가 트리거에 거부됨
