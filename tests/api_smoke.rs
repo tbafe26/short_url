@@ -2,15 +2,16 @@
 #![cfg(feature = "server")]
 #![allow(non_snake_case)]
 
+mod common;
+
 use axum::{body::Body, http::Request, http::StatusCode};
-use short_url::api::{AppState, api_router};
+use common::app;
 use sqlx::PgPool;
 use tower::ServiceExt;
 
 #[sqlx::test]
 async fn health_는_200을_응답한다(pool: PgPool) {
-    let app = api_router(AppState::new(pool, "https://short.test".into()));
-    let res = app
+    let res = app(pool)
         .oneshot(Request::get("/api/health").body(Body::empty()).unwrap())
         .await
         .unwrap();

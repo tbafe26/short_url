@@ -2,11 +2,13 @@
 #![cfg(feature = "server")]
 #![allow(non_snake_case)]
 
+mod common;
+
 use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode, header},
 };
-use short_url::api::{AppState, api_router};
+use common::app;
 use sqlx::PgPool;
 use tower::ServiceExt;
 
@@ -14,7 +16,7 @@ use tower::ServiceExt;
 async fn 없는_번호와_비정규형_숫자_경로는_404_안내_HTML을_응답한다(
     pool: PgPool,
 ) {
-    let app = api_router(AppState::new(pool, "https://short.test".into()));
+    let app = app(pool);
 
     for path in ["/1", "/0", "/0123", "/99999999999999999999"] {
         let res = app

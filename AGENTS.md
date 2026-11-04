@@ -67,7 +67,7 @@ npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 - `dx build --release --fullstack`은 서버와 WASM을 모두 release로 빌드해 첫 실행에 15분 정도 걸린다. 셸 타임아웃을 넉넉히 잡고 백그라운드로 돌린다.
 - 웹 번들 출력(`target/dx/short_url/release/web/public`)에는 이전 빌드의 자산이 쌓인다. Worker 배포 전에는 그 폴더를 지우고 다시 빌드한다.
 - `dx serve`/`cargo test` 전에 서로의 `target` 잠금을 피하려면 `dx serve`를 먼저 끈다.
-- API는 `src/api.rs`의 `api_router()`에 모으고, `src/main.rs`가 Dioxus 서버 라우터에 합친다. 테스트는 이 라우터를 `tower::ServiceExt::oneshot`으로 직접 호출한다.
+- API는 `src/api.rs`의 `api_router()`에 모으고, `src/main.rs`가 Dioxus 서버 라우터에 합친다. 테스트는 이 라우터를 `tower::ServiceExt::oneshot`으로 직접 호출한다. 발급·이동 같은 공용 도우미는 `tests/common/mod.rs`에 있다.
 - DB 통합 테스트에는 다음 시나리오를 포함한다.
   - 동시 생성 요청 시 번호 충돌이 없음
   - UPDATE/DELETE가 트리거에 거부됨

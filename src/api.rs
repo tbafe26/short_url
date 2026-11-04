@@ -2,7 +2,7 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, State, rejection::JsonRejection},
     http::{HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::{get, post, put},
@@ -55,17 +55,24 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// 원본 URL을 서버에서 검증한 뒤 링크를 발급한다. 검증 실패는 400과 오류 메시지로 응답한다.
+/// `400`과 `{"error": <메시지>}` 본문.
+fn bad_request(message: &str) -> Response {
+    let body = Json(serde_json::json!({ "error": message }));
+    (StatusCode::BAD_REQUEST, body).into_response()
+}
+
+/// 원본 URL을 서버에서 검증한 뒤 링크를 발급한다.
+/// 본문 형식 오류와 검증 실패는 모두 400과 오류 메시지로 응답한다.
 async fn create_link(
     State(state): State<AppState>,
-    Json(req): Json<CreateLinkRequest>,
+    req: Result<Json<CreateLinkRequest>, JsonRejection>,
 ) -> Response {
+    let Ok(Json(req)) = req else {
+        return bad_request(r#"요청 본문은 {"url": "<원본 URL>"} 형식의 JSON이어야 합니다."#);
+    };
     let original_url = match validate_original_url(&req.url, &state.public_base_url) {
         Ok(url) => url,
-        Err(e) => {
-            let body = Json(serde_json::json!({ "error": e.to_string() }));
-            return (StatusCode::BAD_REQUEST, body).into_response();
-        }
+        Err(e) => return bad_request(&e.to_string()),
     };
     let Ok(link) = links::insert(&state.pool, &original_url).await else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -123,7 +130,7 @@ fn not_found() -> Response {
 <body>
 <main>
 <h1>찾을 수 없는 단축 주소</h1>
-<p>없는 단축 번호이거나 올바르지 않은 주소다.</p>
+<p>없는 단축 번호이거나 올바르지 않은 주소입니다.</p>
 <p><a href="/">새 단축 주소 만들기</a></p>
 </main>
 </body>
