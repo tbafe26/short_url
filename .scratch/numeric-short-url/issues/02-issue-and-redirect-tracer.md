@@ -4,12 +4,16 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `links` 테이블이 마이그레이션으로 만들어지고, 서버 시작 시 자동 적용된다 (`number BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`, `original_url`, `created_at`)
-- [ ] 링크 저장소의 공개 인터페이스는 `insert`와 `find`뿐이다
-- [ ] 생성 API가 스펙의 계약대로 `201`과 `number`·`short_url`·`original_url`을 응답한다 (`short_url`은 `PUBLIC_BASE_URL` 기준)
-- [ ] `GET /{n}`이 존재하는 링크에 대해 `301`과 `Location: <원본 URL>`을 응답한다
-- [ ] 화면에서 생성 후 단축 주소가 표시된다
-- [ ] 경계 1 테스트 하네스(실제 `Router`를 `oneshot`으로 호출, 테스트별 격리 DB)가 있고, 생성→이동 행복 경로 테스트가 통과한다
-- [ ] `.env.example`에 백엔드 환경변수 이름이 있다 (값 없음)
+- [x] `links` 테이블이 마이그레이션으로 만들어지고, 서버 시작 시 자동 적용된다 (`number BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`, `original_url`, `created_at`)
+- [x] 링크 저장소의 공개 인터페이스는 `insert`와 `find`뿐이다
+- [x] 생성 API가 스펙의 계약대로 `201`과 `number`·`short_url`·`original_url`을 응답한다 (`short_url`은 `PUBLIC_BASE_URL` 기준)
+- [x] `GET /{n}`이 존재하는 링크에 대해 `301`과 `Location: <원본 URL>`을 응답한다
+- [x] 화면에서 생성 후 단축 주소가 표시된다
+- [x] 경계 1 테스트 하네스(실제 `Router`를 `oneshot`으로 호출, 테스트별 격리 DB)가 있고, 생성→이동 행복 경로 테스트가 통과한다
+- [x] `.env.example`에 백엔드 환경변수 이름이 있다 (값 없음)
+
+## Comments
+
+화면 표시는 컴파일·빌드(dx)만 확인했고 브라우저에서 직접 눌러 보지는 않았다. API 경로는 경계 1 테스트로 검증했다.
