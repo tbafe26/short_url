@@ -18,7 +18,7 @@
 
 - cargo-chef는 쓰지 않았다. `dx`가 자체 프로필(`server-release`, `wasm-release`)로 빌드해서 cargo-chef가 미리 빌드한 의존성을 재사용하지 못하기 때문이다. 그 대신 `dx`는 cargo-binstall로 미리 빌드된 바이너리를 받아 빌드 시간을 줄였다.
 - 정적 검토 근거: 로컬 `dx build --release`의 산출물이 `target/dx/short_url/release/web/` 아래 `server`(Windows는 `server.exe`)와 `public/`로 나온다. 그래서 이 폴더를 통째로 `/app/`에 복사하고 `/app/server`를 실행한다. 서버는 `ENV IP=0.0.0.0`과 Railway가 주입하는 `PORT`로 바인드한다.
-- 런타임 이미지는 `debian:bookworm-slim`과 `ca-certificates`다. TLS는 rustls라 OpenSSL이 필요 없다.
+- 런타임 이미지는 `debian:trixie-slim`과 `ca-certificates`다. TLS는 rustls라 OpenSSL이 필요 없다.
 
 ### Railway 배포 절차 (사용자가 직접)
 

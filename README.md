@@ -160,7 +160,7 @@ npx wrangler deploy --dry-run --config cloudflare/wrangler.jsonc
 5. **Settings → Networking → Generate Domain**으로 `https://<백엔드>.up.railway.app`을 만든다.
 6. **Settings → Deploy → Serverless**를 켠다. 유휴 시간에 절전해 크레딧을 아낀다. Postgres는 켜지 않는다.
 
-`Dockerfile`은 멀티스테이지다. 1단계에서 `dx build --release --fullstack`으로 서버와 웹 번들을 빌드하고, 2단계에서 실행 파일과 `public/`만 `debian:bookworm-slim`에 담는다.
+`Dockerfile`은 멀티스테이지다. 1단계에서 `dx build --release --fullstack`으로 서버와 웹 번들을 빌드하고, 2단계에서 실행 파일과 `public/`만 `debian:trixie-slim`에 담는다.
 
 ### 2. Cloudflare (공개 접점)
 
