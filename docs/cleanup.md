@@ -44,6 +44,7 @@ Node.js, Git, Docker Desktop, winget, `C:\Program Files (x86)\Microsoft Visual S
 | dioxus-cli 빌드 캐시 | `~/.cargo/dx-build` | 위 `rustup self uninstall`에 포함 |
 | VS 2022 Build Tools (C++ 워크로드) | 약 3~6GB | 관리자 PowerShell에서 `winget uninstall --id Microsoft.VisualStudio.2022.BuildTools` |
 | 실패한 cargo 설치 잔여물 | `%TEMP%\cargo-install*` | PowerShell에서 `Remove-Item -Recurse -Force "$env:TEMP\cargo-install*"` |
+| TruffleHog 3.99.8 (민감 정보 스캔, 공식 릴리스 압축 해제) | `%LOCALAPPDATA%\trufflehog` | PowerShell에서 `Remove-Item -Recurse -Force "$env:LOCALAPPDATA\trufflehog"` |
 | wrangler npx 캐시 | `%LOCALAPPDATA%\npm-cache\_npx` | `npm cache clean --force` (다른 프로젝트의 npx 캐시도 함께 지워짐) |
 
 ## 정리 확인
