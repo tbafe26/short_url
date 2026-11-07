@@ -15,8 +15,8 @@
     // Worker 스크립트를 거치지 않고 index.html로 응답되기 때문이다.
   },
   "vars": {
-    // Railway 백엔드 공개 주소 (끝에 `/` 없이). 공개 주소라 비밀이 아니다.
-    // 다른 백엔드로 배포하려면 `npx wrangler deploy --var BACKEND_ORIGIN:https://...`로 덮어쓴다.
-    "BACKEND_ORIGIN": "https://shorturl-production-fb10.up.railway.app"
+    // Railway 백엔드 공개 주소 (끝에 `/` 없이). 실제 주소는 저장소에 두지 않는다.
+    // 배포할 때 `npx wrangler deploy --var BACKEND_ORIGIN:https://...`로 덮어쓴다.
+    "BACKEND_ORIGIN": "https://replace-with-railway-backend.invalid"
   }
 }
